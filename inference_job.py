@@ -146,6 +146,7 @@ class InferenceJob:
             self._tts_stream.push_text(delta)
             self.finished_generating = True
             self.current_response += delta
+
         
         await self._tts_stream.flush()
 

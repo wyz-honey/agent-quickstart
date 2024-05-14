@@ -1,8 +1,6 @@
 import asyncio
-import base64
 import contextlib
 import dataclasses
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -78,7 +76,6 @@ class Callback(ResultCallback):
     def on_event(self, result: SpeechSynthesisResult):
         audio_frame = result.get_audio_frame()
         if  audio_frame is not None:
-            print('audio result length:', sys.getsizeof(audio_frame))
             audio_frame = rtc.AudioFrame(
                 data=audio_frame,
                 sample_rate=24000,
@@ -92,10 +89,6 @@ class Callback(ResultCallback):
                     audio=tts.SynthesizedAudio(text="", data=audio_frame),
                 )
             )
-      
-
-        if result.get_timestamp() is not None:
-            print('timestamp result:', str(result.get_timestamp()))
 
 class TTS(tts.TTS):
     def __init__(
@@ -205,38 +198,67 @@ class SynthesizeStream(tts.SynthesizeStream):
         callback = Callback(self)
       
         started = False
-        while True:
-            try:
-                text = None
-                text = await self._queue.get()
-                if not started:
-                        self._event_queue.put_nowait(
-                            tts.SynthesisEvent(type=tts.SynthesisEventType.STARTED)
-                        )
-                        started = True
-                loop = asyncio.get_event_loop()
-                loop.run_in_executor(
-                    self._executor,  # 假设 self._executor 是一个 ThreadPoolExecutor 实例
-                    lambda: SpeechSynthesizer.call(
-                        model='sambert-zhichu-v1',
-                        text=text,
-                        sample_rate=24000,
-                        format='pcm',
-                        callback=callback,
-                    ),
-                )
-                self._queue.task_done()
-                if text == STREAM_EOS:
-                    # We know 11labs is closing the stream after each request/flush
+        try:
+            text = None
+            text = await self._queue.get()
+            if not started:
                     self._event_queue.put_nowait(
-                        tts.SynthesisEvent(type=tts.SynthesisEventType.FINISHED)
+                        tts.SynthesisEvent(type=tts.SynthesisEventType.STARTED)
                     )
-                    break
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
+                    started = True
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(
+                self._executor,  # 假设 self._executor 是一个 ThreadPoolExecutor 实例
+                lambda: SpeechSynthesizer.call(
+                    model='sambert-zhichu-v1',
+                    text=text,
+                    sample_rate=24000,
+                    format='pcm',
+                    callback=callback,
+                ),
+            )
+            self._queue.task_done()
+            if text == STREAM_EOS:
+                # We know 11labs is closing the stream after each request/flush
+                self._event_queue.put_nowait(
+                    tts.SynthesisEvent(type=tts.SynthesisEventType.FINISHED)
+                )
+        except asyncio.CancelledError:
+                pass
+        except Exception as e:
                 print(e)
-            await asyncio.sleep(200)
+        # while True:
+        #     try:
+        #         text = None
+        #         text = await self._queue.get()
+        #         if not started:
+        #                 self._event_queue.put_nowait(
+        #                     tts.SynthesisEvent(type=tts.SynthesisEventType.STARTED)
+        #                 )
+        #                 started = True
+        #         loop = asyncio.get_event_loop()
+        #         loop.run_in_executor(
+        #             self._executor,  # 假设 self._executor 是一个 ThreadPoolExecutor 实例
+        #             lambda: SpeechSynthesizer.call(
+        #                 model='sambert-zhichu-v1',
+        #                 text=text,
+        #                 sample_rate=24000,
+        #                 format='pcm',
+        #                 callback=callback,
+        #             ),
+        #         )
+        #         self._queue.task_done()
+        #         if text == STREAM_EOS:
+        #             # We know 11labs is closing the stream after each request/flush
+        #             self._event_queue.put_nowait(
+        #                 tts.SynthesisEvent(type=tts.SynthesisEventType.FINISHED)
+        #             )
+        #             break
+        #     except asyncio.CancelledError:
+        #         break
+        #     except Exception as e:
+        #         print(e)
+        #     await asyncio.sleep(200)
 
     
     async def flush(self) -> None:

@@ -9,8 +9,8 @@ from livekit.agents import (
     WorkerOptions,
     cli,
 )
-from livekit.plugins.deepgram import STT
-# from alibabacloud.stt import STT
+# from livekit.plugins.deepgram import STT
+from alibabacloud.stt import STT
 from state_manager import StateManager
 
 
