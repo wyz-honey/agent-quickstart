@@ -9,7 +9,8 @@ from typing import List
 from attr import define
 from livekit import agents, rtc
 from livekit.agents.llm import ChatContext, ChatMessage, ChatRole
-from livekit.plugins.elevenlabs import TTS
+# from livekit.plugins.elevenlabs import TTS
+from alibabacloud.tts import TTS
 from livekit.plugins.openai import LLM
 
 
@@ -37,7 +38,6 @@ class InferenceJob:
         self._done_future = asyncio.Future()
         self._cancelled = False
         self._force_text_response = force_text_response
-
     @property
     def id(self):
         return self._id
@@ -126,6 +126,7 @@ class InferenceJob:
 
     async def _llm_task(self):
         if self._force_text_response:
+            
             self._tts_stream.push_text(self._force_text_response)
             self.current_response = self._force_text_response
             self.finished_generating = True
@@ -138,12 +139,14 @@ class InferenceJob:
         )
         async for chunk in await self._llm.chat(history=chat_context):
             delta = chunk.choices[0].delta.content
+            print(f"delta: {delta}")
+            self.finished_generating = False
             if delta is None:
                 break
             self._tts_stream.push_text(delta)
+            self.finished_generating = True
             self.current_response += delta
-        print(f"llmresp: {self.current_response}")
-        self.finished_generating = True
+        
         await self._tts_stream.flush()
 
     async def _tts_task(self):

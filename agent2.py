@@ -10,6 +10,7 @@ from livekit.agents import (
     cli,
 )
 from livekit.plugins.deepgram import STT
+# from alibabacloud.stt import STT
 from state_manager import StateManager
 
 
